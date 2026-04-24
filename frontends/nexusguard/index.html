@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusGuard — Deteção de Anomalias</title>
+    <meta name="description" content="NexusGuard: detetor de anomalias e fraude em tempo real com Isolation Forest.">
+    <meta name="theme-color" content="#07111f">
+    <link rel="icon" href="https://ainexuspt.com/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Manrope", system-ui, sans-serif;
+            --bg: #06111f;
+            --bg-2: #09192b;
+            --panel: rgba(8, 15, 27, .82);
+            --line: rgba(148, 163, 184, .14);
+            --text: #edf2f7;
+            --muted: #b4c0cf;
+            --muted-2: #8ea0b6;
+            --sky: #7dd3fc;
+            --teal: #5eead4;
+            --sky-strong: #38bdf8;
+            --radius-xl: 32px;
+            --radius-lg: 24px;
+            --font-display: "Fraunces", Georgia, serif
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            background: radial-gradient(circle at 20% 10%, rgba(56, 189, 248, .18), transparent 30%), radial-gradient(circle at 80% 20%, rgba(20, 184, 166, .15), transparent 24%), linear-gradient(180deg, #06111f 0%, #09192b 52%, #06111f 100%);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased
+        }
+
+        a {
+            color: var(--sky);
+            text-decoration: none
+        }
+
+        a:hover {
+            text-decoration: underline
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+            font-family: var(--font-display);
+            letter-spacing: -.05em
+        }
+
+        .shell {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px 16px 60px
+        }
+
+        .back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: .9rem;
+            color: var(--muted);
+            margin-bottom: 18px;
+            transition: color .2s
+        }
+
+        .back:hover {
+            color: var(--sky);
+            text-decoration: none
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 32px
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            color: white;
+            line-height: 1
+        }
+
+        .hero p {
+            color: var(--muted);
+            max-width: 60ch;
+            margin: 12px auto 0;
+            font-size: 1.05rem
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-size: .75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            background: rgba(56, 189, 248, .15);
+            color: var(--sky);
+            margin-bottom: 10px
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(180deg, rgba(9, 18, 32, .95), rgba(7, 14, 26, .82));
+            padding: 28px;
+            margin-bottom: 20px
+        }
+
+        .card h2 {
+            font-size: 1.3rem;
+            color: white;
+            margin-bottom: 14px
+        }
+
+        .card p.desc {
+            color: var(--muted);
+            font-size: .92rem;
+            margin: 0 0 18px
+        }
+
+        label {
+            display: block;
+            font-size: .88rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 6px
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: rgba(15, 23, 42, .6);
+            color: var(--text);
+            font: inherit;
+            font-size: .95rem;
+            transition: border-color .2s
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--sky-strong)
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px
+        }
+
+        .form-group {
+            margin-bottom: 12px
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0 24px;
+            border: none;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: .95rem;
+            cursor: pointer;
+            transition: transform .18s, box-shadow .18s, background .18s
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--sky-strong), var(--teal));
+            color: #06111f
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(56, 189, 248, .3)
+        }
+
+        .btn-primary:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none
+        }
+
+        .btn-sm {
+            min-height: 36px;
+            padding: 0 16px;
+            font-size: .85rem
+        }
+
+        .result-box {
+            margin-top: 16px;
+            padding: 18px;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, .5);
+            border: 1px solid var(--line);
+            display: none;
+            white-space: pre-wrap;
+            font-size: .9rem;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto
+        }
+
+        .result-box.show {
+            display: block
+        }
+
+        .result-box.error {
+            border-color: rgba(248, 113, 113, .3);
+            color: #fca5a5
+        }
+
+        .result-box.success {
+            border-color: rgba(56, 189, 248, .2)
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 100px;
+            background: rgba(56, 189, 248, .08);
+            color: var(--sky);
+            font-size: .78rem;
+            font-weight: 500;
+            margin-right: 4px
+        }
+
+        .tag-anomaly {
+            background: rgba(248, 113, 113, .12);
+            color: #fca5a5
+        }
+
+        .tag-normal {
+            background: rgba(74, 222, 128, .12);
+            color: #4ade80
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px
+        }
+
+        .status-dot.online {
+            background: #4ade80
+        }
+
+        .status-dot.offline {
+            background: #f87171
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px
+        }
+
+        .stat {
+            text-align: center;
+            padding: 16px;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, .4);
+            border: 1px solid var(--line)
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            font-family: var(--font-display)
+        }
+
+        .stat-label {
+            font-size: .78rem;
+            color: var(--muted);
+            margin-top: 2px
+        }
+
+        .loader {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--line);
+            border-top-color: var(--sky);
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+            margin-left: 8px
+        }
+
+        .loader.show {
+            display: inline-block
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 0
+        }
+
+        .tab {
+            padding: 10px 18px;
+            border: none;
+            background: none;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: .92rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color .2s, border-color .2s
+        }
+
+        .tab.active {
+            color: var(--sky);
+            border-bottom-color: var(--sky)
+        }
+
+        .tab:hover {
+            color: var(--text)
+        }
+
+        .tab-content {
+            display: none
+        }
+
+        .tab-content.active {
+            display: block
+        }
+
+        .api-link {
+            font-size: .85rem;
+            color: var(--muted-2)
+        }
+
+        .footer-bar {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(148, 163, 184, .08);
+            color: var(--muted-2);
+            font-size: .85rem
+        }
+
+        @media(max-width:640px) {
+            .form-row {
+                grid-template-columns: 1fr
+            }
+
+            .shell {
+                padding: 16px 12px 40px
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shell">
+        <a href="/" class="back">← Projetos</a>
+        <div class="hero">
+            <span class="badge">Live</span>
+            <h1>🛡️ NexusGuard</h1>
+            <p>Deteção de anomalias e fraude em tempo real com Isolation Forest. Monitoriza fluxos de dados e identifica
+                comportamentos suspeitos.</p>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat">
+                <div class="stat-value" id="stat-status"><span class="status-dot" id="status-dot"></span>—</div>
+                <div class="stat-label">Estado</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="stat-model">—</div>
+                <div class="stat-label">Modelo</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="stat-tech">IF</div>
+                <div class="stat-label">Algoritmo</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="single" onclick="switchTab('single')">Análise Individual</button>
+            <button class="tab" data-tab="batch" onclick="switchTab('batch')">Análise em Lote</button>
+            <button class="tab" data-tab="train" onclick="switchTab('train')">Treinar Modelo</button>
+        </div>
+
+        <!-- Single Prediction -->
+        <div class="tab-content active" id="tab-single">
+            <div class="card">
+                <h2>Detetar Anomalia</h2>
+                <p class="desc">Introduz valores numéricos (features) para detetar se representam uma anomalia.</p>
+                <div class="form-group">
+                    <label>Features (valores separados por vírgula)</label>
+                    <input type="text" id="single-features" placeholder="ex: 0.5, 1.2, -0.3, 2.1, 0.8">
+                </div>
+                <button class="btn btn-primary" onclick="predictSingle()" id="btn-single">
+                    Analisar <span class="loader" id="loader-single"></span>
+                </button>
+                <div class="result-box" id="result-single"></div>
+            </div>
+        </div>
+
+        <!-- Batch Prediction -->
+        <div class="tab-content" id="tab-batch">
+            <div class="card">
+                <h2>Análise em Lote</h2>
+                <p class="desc">Introduz múltiplos registos (um por linha, valores separados por vírgula) para analisar
+                    anomalias em lote.</p>
+                <div class="form-group">
+                    <label>Dados (um registo por linha)</label>
+                    <textarea id="batch-features" rows="5"
+                        placeholder="0.5, 1.2, -0.3, 2.1&#10;1.0, 0.8, 0.2, -0.5&#10;10.5, -8.3, 15.1, 20.0"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="predictBatch()" id="btn-batch">
+                    Analisar Lote <span class="loader" id="loader-batch"></span>
+                </button>
+                <div class="result-box" id="result-batch"></div>
+            </div>
+        </div>
+
+        <!-- Train -->
+        <div class="tab-content" id="tab-train">
+            <div class="card">
+                <h2>Treinar Modelo</h2>
+                <p class="desc">Faz upload de um ficheiro CSV com dados de treino. O modelo Isolation Forest será
+                    re-treinado com os novos dados.</p>
+                <div class="form-group">
+                    <label>Ficheiro CSV</label>
+                    <input type="file" id="train-file" accept=".csv" style="padding:8px">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Contamination (0-0.5)</label>
+                        <input type="number" id="train-contamination" value="0.1" min="0.01" max="0.5" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>N.º Estimadores</label>
+                        <input type="number" id="train-estimators" value="100" min="10" max="1000" step="10">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="trainModel()" id="btn-train">
+                    Treinar <span class="loader" id="loader-train"></span>
+                </button>
+                <div class="result-box" id="result-train"></div>
+            </div>
+        </div>
+
+        <p class="api-link" style="text-align:center;margin-top:20px">
+            <a href="/nexusguard/docs" target="_blank">📄 Documentação da API (Swagger)</a>
+        </p>
+        <div class="footer-bar">Mario Mendes / <a href="https://ainexuspt.com">ainexuspt.com</a></div>
+    </div>
+
+    <script>
+        const API = '/nexusguard';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        function showResult(id, data, isError) {
+            const el = document.getElementById(id);
+            el.classList.add('show');
+            el.classList.toggle('error', !!isError);
+            el.classList.toggle('success', !isError);
+            if (typeof data === 'string') {
+                el.textContent = data;
+            } else {
+                el.innerHTML = formatResult(data);
+            }
+        }
+
+        function formatResult(data) {
+            if (data.is_anomaly !== undefined) {
+                const tag = data.is_anomaly
+                    ? '<span class="tag tag-anomaly">⚠️ Anomalia</span>'
+                    : '<span class="tag tag-normal">✅ Normal</span>';
+                return `${tag}\n\nScore: ${data.anomaly_score?.toFixed(4) ?? '—'}\nFeatures analisadas: ${data.features?.length ?? '—'}`;
+            }
+            if (data.results) {
+                return data.results.map((r, i) => {
+                    const tag = r.is_anomaly
+                        ? '<span class="tag tag-anomaly">⚠️ Anomalia</span>'
+                        : '<span class="tag tag-normal">✅ Normal</span>';
+                    return `Registo ${i + 1}: ${tag}  Score: ${r.anomaly_score?.toFixed(4) ?? '—'}`;
+                }).join('\n');
+            }
+            return JSON.stringify(data, null, 2);
+        }
+
+        function setLoading(id, loading) {
+            document.getElementById(`loader-${id}`).classList.toggle('show', loading);
+            document.getElementById(`btn-${id}`).disabled = loading;
+        }
+
+        async function predictSingle() {
+            const raw = document.getElementById('single-features').value.trim();
+            if (!raw) return;
+            const features = raw.split(',').map(Number);
+            setLoading('single', true);
+            try {
+                const res = await fetch(`${API}/predict`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ features })
+                });
+                const data = await res.json();
+                if (!res.ok) throw data;
+                showResult('result-single', data);
+            } catch (e) {
+                showResult('result-single', e.detail || JSON.stringify(e, null, 2), true);
+            }
+            setLoading('single', false);
+        }
+
+        async function predictBatch() {
+            const raw = document.getElementById('batch-features').value.trim();
+            if (!raw) return;
+            const data_points = raw.split('\n').filter(l => l.trim()).map(line => ({
+                features: line.split(',').map(Number)
+            }));
+            setLoading('batch', true);
+            try {
+                const res = await fetch(`${API}/predict/batch`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data_points })
+                });
+                const data = await res.json();
+                if (!res.ok) throw data;
+                showResult('result-batch', data);
+            } catch (e) {
+                showResult('result-batch', e.detail || JSON.stringify(e, null, 2), true);
+            }
+            setLoading('batch', false);
+        }
+
+        async function trainModel() {
+            const file = document.getElementById('train-file').files[0];
+            if (!file) return alert('Seleciona um ficheiro CSV.');
+            const form = new FormData();
+            form.append('file', file);
+            form.append('contamination', document.getElementById('train-contamination').value);
+            form.append('n_estimators', document.getElementById('train-estimators').value);
+            setLoading('train', true);
+            try {
+                const res = await fetch(`${API}/train`, { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw data;
+                showResult('result-train', data);
+                checkHealth();
+            } catch (e) {
+                showResult('result-train', e.detail || JSON.stringify(e, null, 2), true);
+            }
+            setLoading('train', false);
+        }
+
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API}/health`);
+                const data = await res.json();
+                const dot = document.getElementById('status-dot');
+                const status = document.getElementById('stat-status');
+                const model = document.getElementById('stat-model');
+                if (data.status === 'ok') {
+                    dot.className = 'status-dot online';
+                    status.innerHTML = `<span class="status-dot online"></span>Online`;
+                    model.textContent = data.model_loaded ? 'Carregado' : 'Não treinado';
+                }
+            } catch {
+                document.getElementById('status-dot').className = 'status-dot offline';
+                document.getElementById('stat-status').innerHTML = '<span class="status-dot offline"></span>Offline';
+            }
+        }
+
+        checkHealth();
+    </script>
+</body>
+
+</html>

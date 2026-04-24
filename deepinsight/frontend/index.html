@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepInsight | Analisador de Sentimento</title>
+    <meta name="description"
+        content="DeepInsight – Analisador de sentimento e tópicos com IA local usando DistilBERT + LDA.">
+    <meta name="theme-color" content="#07111f">
+    <link rel="icon" href="https://ainexuspt.com/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Manrope", system-ui, sans-serif;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #edf2f7;
+            background: radial-gradient(circle at 20% 10%, rgba(56, 189, 248, .18), transparent 30%), radial-gradient(circle at 80% 20%, rgba(20, 184, 166, .15), transparent 24%), linear-gradient(180deg, #06111f 0%, #09192b 52%, #06111f 100%);
+            --bg: #06111f;
+            --bg-2: #09192b;
+            --panel: rgba(8, 15, 27, .82);
+            --line: rgba(148, 163, 184, .14);
+            --line-soft: rgba(148, 163, 184, .08);
+            --text: #edf2f7;
+            --muted: #b4c0cf;
+            --muted-2: #8ea0b6;
+            --sky: #7dd3fc;
+            --teal: #5eead4;
+            --sky-strong: #38bdf8;
+            --shadow: 0 30px 90px rgba(2, 6, 23, .35);
+            --radius-xl: 32px;
+            --radius-lg: 24px;
+            --radius-md: 18px;
+            --font-display: "Fraunces", Georgia, serif
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text)
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none
+        }
+
+        ::selection {
+            color: #fff;
+            background: rgba(56, 189, 248, .28)
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+            font-family: var(--font-display);
+            letter-spacing: -.05em
+        }
+
+        h1 {
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            line-height: 1;
+            color: #fff
+        }
+
+        h2 {
+            font-size: 1.3rem;
+            color: #fff
+        }
+
+        .topbar {
+            position: sticky;
+            top: 16px;
+            z-index: 20;
+            width: min(1180px, calc(100% - 24px));
+            margin: 16px auto 0;
+            padding: 14px 16px;
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: rgba(2, 6, 23, .72);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 12px 36px rgba(2, 6, 23, .18)
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none
+        }
+
+        .brand-logo {
+            width: 340px;
+            height: 92px;
+            object-fit: contain;
+            object-position: left center;
+            filter: drop-shadow(0 12px 24px rgba(2, 6, 23, .18))
+        }
+
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center
+        }
+
+        .nav-link {
+            padding: 10px 12px;
+            border-radius: 999px;
+            color: #dce7f3;
+            font-size: .95rem;
+            transition: background .18s, color .18s
+        }
+
+        .nav-link:hover,
+        .nav-link.is-active {
+            background: rgba(125, 211, 252, .12);
+            color: #fff;
+            box-shadow: inset 0 0 0 1px rgba(125, 211, 252, .18)
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0
+        }
+
+        .page {
+            width: min(900px, calc(100% - 24px));
+            margin: 0 auto;
+            padding: 32px 0 60px
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 40px
+        }
+
+        .hero .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 14px;
+            font-size: .74rem;
+            font-weight: 900;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+            color: var(--sky)
+        }
+
+        .hero .lead {
+            color: var(--muted);
+            max-width: 60ch;
+            margin: 12px auto 0;
+            font-size: 1.05rem
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(180deg, rgba(9, 18, 32, .95), rgba(7, 14, 26, .82));
+            box-shadow: var(--shadow);
+            padding: 28px;
+            margin-bottom: 24px
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px
+        }
+
+        .section-title .icon {
+            font-size: 1.4rem
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: .88rem;
+            font-weight: 600
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: rgba(6, 17, 31, .7);
+            color: var(--text);
+            font: inherit;
+            font-size: .95rem;
+            transition: border-color .2s
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--sky-strong)
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 120px
+        }
+
+        select {
+            cursor: pointer
+        }
+
+        .form-group {
+            margin-bottom: 16px
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            padding: 0 24px;
+            border: none;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: .95rem;
+            cursor: pointer;
+            transition: transform .18s, box-shadow .18s, background .18s
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--sky-strong), var(--teal));
+            color: #06111f
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(56, 189, 248, .3)
+        }
+
+        .btn-secondary {
+            background: rgba(125, 211, 252, .1);
+            color: var(--sky);
+            border: 1px solid rgba(125, 211, 252, .2)
+        }
+
+        .btn-secondary:hover {
+            background: rgba(125, 211, 252, .18)
+        }
+
+        .btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none
+        }
+
+        .result-box {
+            margin-top: 16px;
+            padding: 18px;
+            border-radius: var(--radius-md);
+            background: rgba(6, 17, 31, .6);
+            border: 1px solid var(--line);
+            min-height: 60px;
+            font-family: "Courier New", monospace;
+            font-size: .88rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--muted);
+            transition: border-color .3s
+        }
+
+        .result-box.success {
+            border-color: rgba(94, 234, 212, .3);
+            color: var(--teal)
+        }
+
+        .result-box.error {
+            border-color: rgba(248, 113, 113, .3);
+            color: #f87171
+        }
+
+        .sentiment-visual {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            align-items: center
+        }
+
+        .sentiment-bar {
+            flex: 1;
+            height: 28px;
+            border-radius: 14px;
+            background: rgba(148, 163, 184, .1);
+            overflow: hidden;
+            position: relative
+        }
+
+        .sentiment-fill {
+            height: 100%;
+            border-radius: 14px;
+            transition: width .5s ease
+        }
+
+        .sentiment-fill.positive {
+            background: linear-gradient(90deg, #5eead4, #38bdf8)
+        }
+
+        .sentiment-fill.negative {
+            background: linear-gradient(90deg, #fb923c, #f87171)
+        }
+
+        .sentiment-label {
+            font-size: .82rem;
+            font-weight: 700;
+            min-width: 80px;
+            text-align: right
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 14px 20px;
+            border-radius: 16px;
+            background: rgba(94, 234, 212, .06);
+            border: 1px solid rgba(94, 234, 212, .15);
+            margin-bottom: 24px;
+            font-size: .9rem
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #5eead4;
+            box-shadow: 0 0 8px rgba(94, 234, 212, .5);
+            animation: pulse 2s infinite
+        }
+
+        .status-bar.offline .status-dot {
+            background: #f87171;
+            box-shadow: 0 0 8px rgba(248, 113, 113, .5)
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .5
+            }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap
+        }
+
+        .tab {
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: .88rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: rgba(125, 211, 252, .06);
+            color: var(--muted);
+            border: 1px solid transparent;
+            transition: all .2s
+        }
+
+        .tab.active {
+            background: rgba(125, 211, 252, .12);
+            color: var(--sky);
+            border-color: rgba(125, 211, 252, .2)
+        }
+
+        .tab:hover {
+            color: var(--sky)
+        }
+
+        .tab-content {
+            display: none
+        }
+
+        .tab-content.active {
+            display: block
+        }
+
+        .api-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: .85rem;
+            color: var(--sky);
+            opacity: .7;
+            transition: opacity .2s
+        }
+
+        .api-link:hover {
+            opacity: 1
+        }
+
+        .footer {
+            width: min(900px, calc(100% - 24px));
+            margin: 0 auto;
+            padding: 20px 4px 34px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            color: var(--muted-2);
+            font-size: .92rem;
+            border-top: 1px solid var(--line-soft)
+        }
+
+        .footer a {
+            color: var(--sky)
+        }
+
+        .loader {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(125, 211, 252, .2);
+            border-top-color: var(--sky);
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+            margin-left: 8px
+        }
+
+        .loading .loader {
+            display: inline-block
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .topic-chip {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 100px;
+            background: rgba(56, 189, 248, .08);
+            color: var(--sky);
+            font-size: .82rem;
+            margin: 3px
+        }
+
+        @media(max-width:640px) {
+            .page {
+                padding-top: 14px
+            }
+
+            .topbar {
+                width: min(100% - 16px, 1180px);
+                padding: 12px;
+                border-radius: 22px
+            }
+
+            .form-row {
+                grid-template-columns: 1fr
+            }
+
+            .brand-logo {
+                width: 200px;
+                height: 56px
+            }
+        }
+
+        .menu-toggle {
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            z-index: 25
+        }
+
+        .menu-toggle-bar {
+            display: block;
+            width: 24px;
+            height: 2px;
+            background: var(--text);
+            border-radius: 2px;
+            transition: transform .25s ease, opacity .25s ease
+        }
+
+        @media(max-width:1024px) {
+            .menu-toggle {
+                display: flex
+            }
+
+            .nav {
+                display: none;
+                position: absolute;
+                top: calc(100% + 8px);
+                left: 0;
+                right: 0;
+                flex-direction: column;
+                background: rgba(2, 6, 23, .95);
+                backdrop-filter: blur(18px);
+                border: 1px solid var(--line);
+                border-radius: var(--radius-lg);
+                padding: 16px;
+                gap: 6px
+            }
+
+            .nav-open {
+                display: flex
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <a class="brand" href="https://ainexuspt.com">
+            <img class="brand-logo" src="https://ainexuspt.com/imagens/logo-mm.svg" alt="" aria-hidden="true">
+            <span class="sr-only">Mario Mendes</span>
+        </a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"
+            onclick="var n=document.getElementById('main-nav');n.classList.toggle('nav-open');this.setAttribute('aria-expanded',n.classList.contains('nav-open'))">
+            <span class="menu-toggle-bar"></span><span class="menu-toggle-bar"></span><span
+                class="menu-toggle-bar"></span>
+        </button>
+        <nav class="nav" id="main-nav">
+            <a class="nav-link" href="https://ainexuspt.com/">Início</a>
+            <a class="nav-link" href="https://ainexuspt.com/servicos">Serviços</a>
+            <a class="nav-link" href="https://ainexuspt.com/formacao">Formação</a>
+            <a class="nav-link" href="https://apps.ainexuspt.com">Projetos</a>
+            <a class="nav-link" href="https://ainexuspt.com/sobre">Sobre</a>
+            <a class="nav-link" href="https://ainexuspt.com/contacto">Contacto</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section class="hero">
+            <p class="eyebrow">DeepInsight</p>
+            <h1>🧠 Analisador de Sentimento</h1>
+            <p class="lead">Analisa sentimento e extrai tópicos de textos com DistilBERT e LDA. Suporta análise
+                individual, em lote e upload de ficheiros.</p>
+        </section>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-dot"></span>
+            <span id="statusText">A verificar...</span>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="single" onclick="switchTab('single')">Sentimento</button>
+            <button class="tab" data-tab="batch" onclick="switchTab('batch')">Lote</button>
+            <button class="tab" data-tab="topics" onclick="switchTab('topics')">Tópicos</button>
+            <button class="tab" data-tab="file" onclick="switchTab('file')">Upload Ficheiro</button>
+        </div>
+
+        <!-- Single Sentiment -->
+        <div class="tab-content active" id="tab-single">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">💬</span>
+                    <h2>Análise de Sentimento</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Escreve um texto em inglês e o modelo
+                    classifica o sentimento como positivo ou negativo.</p>
+                <div class="form-group">
+                    <label for="textInput">Texto para analisar</label>
+                    <textarea id="textInput" rows="4"
+                        placeholder="Ex: This product is amazing and works perfectly!"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="analyzeSentiment()">Analisar Sentimento <span
+                        class="loader"></span></button>
+                <button class="btn btn-secondary" onclick="fillSentimentDemo()"
+                    style="font-size:.85rem;min-height:36px;padding:0 14px;margin-left:8px">Exemplo</button>
+                <div class="result-box" id="resultSentiment">Os resultados aparecerão aqui...</div>
+                <div class="sentiment-visual" id="sentimentVisual" style="display:none">
+                    <span class="sentiment-label" id="sentLabel"></span>
+                    <div class="sentiment-bar">
+                        <div class="sentiment-fill" id="sentFill"></div>
+                    </div>
+                    <span id="sentPercent" style="font-size:.85rem;font-weight:700;min-width:50px"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Sentiment -->
+        <div class="tab-content" id="tab-batch">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">📊</span>
+                    <h2>Sentimento em Lote</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Insere múltiplos textos, um por linha.</p>
+                <div class="form-group">
+                    <label for="batchTexts">Textos (um por linha)</label>
+                    <textarea id="batchTexts" rows="6"
+                        placeholder="I love this product&#10;Terrible experience, never again&#10;It was okay, nothing special"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="batchSentiment()">Analisar Lote <span
+                        class="loader"></span></button>
+                <button class="btn btn-secondary" onclick="fillBatchSentimentDemo()"
+                    style="font-size:.85rem;min-height:36px;padding:0 14px;margin-left:8px">Exemplo</button>
+                <div class="result-box" id="resultBatch">Os resultados aparecerão aqui...</div>
+            </div>
+        </div>
+
+        <!-- Topics -->
+        <div class="tab-content" id="tab-topics">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">🏷️</span>
+                    <h2>Extração de Tópicos</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Insere vários textos para extrair tópicos
+                    com LDA. Mínimo 3 textos recomendado.</p>
+                <div class="form-group">
+                    <label for="topicTexts">Textos (um por linha)</label>
+                    <textarea id="topicTexts" rows="6"
+                        placeholder="Machine learning is transforming healthcare&#10;Neural networks can detect diseases early&#10;Hospitals use AI for patient diagnosis"></textarea>
+                </div>
+                <div class="form-row" style="margin-bottom:16px">
+                    <div class="form-group" style="margin:0">
+                        <label for="nTopics">Nº de tópicos</label>
+                        <input type="number" id="nTopics" value="3" min="1" max="20">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label for="nWords">Palavras por tópico</label>
+                        <input type="number" id="nWords" value="8" min="3" max="20">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="extractTopics()">Extrair Tópicos <span
+                        class="loader"></span></button>
+                <button class="btn btn-secondary" onclick="fillTopicsDemo()"
+                    style="font-size:.85rem;min-height:36px;padding:0 14px;margin-left:8px">Exemplo</button>
+                <div class="result-box" id="resultTopics">Os resultados aparecerão aqui...</div>
+            </div>
+        </div>
+
+        <!-- File Upload -->
+        <div class="tab-content" id="tab-file">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">📁</span>
+                    <h2>Analisar Ficheiro</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Faz upload de um ficheiro CSV ou TXT com
+                    textos para análise completa (sentimento + tópicos).</p>
+                <div class="form-group">
+                    <label for="uploadFile">Ficheiro CSV / TXT</label>
+                    <input type="file" id="uploadFile" accept=".csv,.txt" style="padding:10px">
+                </div>
+                <button class="btn btn-primary" onclick="analyzeFile()">Analisar Ficheiro <span
+                        class="loader"></span></button>
+                <div class="result-box" id="resultFile">Os resultados aparecerão aqui...</div>
+            </div>
+        </div>
+
+        <a class="api-link" href="/deepinsight/docs" target="_blank">📄 Documentação da API (Swagger) →</a>
+    </main>
+
+    <footer class="footer">
+        <span>Mario Mendes / ainexuspt.com</span>
+        <span class="footer-links" style="display:inline-flex;gap:14px;flex-wrap:wrap">
+            <a href="https://apps.ainexuspt.com">← Voltar aos Projetos</a>
+            <a href="mailto:mario.mendes@ainexuspt.com">mario.mendes@ainexuspt.com</a>
+        </span>
+    </footer>
+
+    <script>
+        const API = '/deepinsight';
+
+        async function checkHealth() {
+            try {
+                const r = await fetch(API + '/health');
+                const d = await r.json();
+                document.getElementById('statusText').textContent = `Modelo: ${d.model} (${d.device})`;
+                if (d.status !== 'ok') document.getElementById('statusBar').classList.add('offline');
+            } catch {
+                document.getElementById('statusText').textContent = 'Serviço indisponível';
+                document.getElementById('statusBar').classList.add('offline');
+            }
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+        }
+
+        function setLoading(btn, loading) {
+            btn.disabled = loading;
+            btn.classList.toggle('loading', loading);
+        }
+
+        function fillSentimentDemo() {
+            document.getElementById('textInput').value = 'This product is absolutely fantastic! Best purchase I have ever made. Highly recommended for everyone.';
+        }
+        function fillBatchSentimentDemo() {
+            document.getElementById('batchTexts').value = 'I love this product, it works perfectly!\nTerrible experience, the worst service ever.\nThe weather is nice today.\nI am extremely disappointed with the quality.\nGreat job, the team did an amazing work!';
+        }
+        function fillTopicsDemo() {
+            document.getElementById('topicTexts').value = 'Machine learning is transforming healthcare and medicine\nDeep learning models can detect cancer from medical images\nHospitals use artificial intelligence for diagnosis\nPython and TensorFlow are popular tools for data science\nNeural networks improve accuracy in medical predictions\nNatural language processing helps analyze patient records\nRobots assist surgeons during complex operations\nCloud computing enables scalable AI model training';
+        }
+
+        async function analyzeSentiment() {
+            const btn = event.target.closest('.btn');
+            const box = document.getElementById('resultSentiment');
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) { box.textContent = '⚠ Escreve um texto para analisar'; box.className = 'result-box error'; return; }
+            setLoading(btn, true);
+            try {
+                const r = await fetch(API + '/sentiment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                const icon = d.sentiment === 'POSITIVE' ? '😊' : '😞';
+                const label = d.sentiment === 'POSITIVE' ? 'POSITIVO' : 'NEGATIVO';
+                let scoreText = Object.entries(d.scores).map(([k, v]) => `  ${k}: ${(v * 100).toFixed(1)}%`).join('\n');
+                box.textContent = `${icon} Sentimento: ${label}\n\n${scoreText}`;
+                box.className = 'result-box success';
+                // Show visual bar
+                const visual = document.getElementById('sentimentVisual');
+                visual.style.display = 'flex';
+                const posScore = d.scores['POSITIVE'] || 0;
+                const fill = document.getElementById('sentFill');
+                fill.style.width = (posScore * 100) + '%';
+                fill.className = 'sentiment-fill ' + (d.sentiment === 'POSITIVE' ? 'positive' : 'negative');
+                document.getElementById('sentLabel').textContent = label;
+                document.getElementById('sentPercent').textContent = (Math.max(posScore, 1 - posScore) * 100).toFixed(1) + '%';
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+                document.getElementById('sentimentVisual').style.display = 'none';
+            }
+            setLoading(btn, false);
+        }
+
+        async function batchSentiment() {
+            const btn = event.target.closest('.btn');
+            const box = document.getElementById('resultBatch');
+            const raw = document.getElementById('batchTexts').value.trim();
+            if (!raw) { box.textContent = '⚠ Insere textos'; box.className = 'result-box error'; return; }
+            const texts = raw.split('\n').filter(t => t.trim());
+            setLoading(btn, true);
+            try {
+                const r = await fetch(API + '/sentiment/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texts }) });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                const pos = d.results.filter(x => x.sentiment === 'POSITIVE').length;
+                let txt = `📊 ${d.results.length} textos analisados\n😊 Positivos: ${pos} | 😞 Negativos: ${d.results.length - pos}\n\n`;
+                d.results.forEach((x, i) => {
+                    const icon = x.sentiment === 'POSITIVE' ? '😊' : '😞';
+                    const conf = x.scores
+                        ? Math.max(...Object.values(x.scores)) * 100
+                        : ((x.confidence ?? 0) * 100);
+                    txt += `[${i + 1}] ${icon} ${x.sentiment} (${conf.toFixed(1)}%) — "${texts[i].substring(0, 50)}..."\n`;
+                });
+                box.textContent = txt;
+                box.className = 'result-box success';
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+            }
+            setLoading(btn, false);
+        }
+
+        async function extractTopics() {
+            const btn = event.target.closest('.btn');
+            const box = document.getElementById('resultTopics');
+            const raw = document.getElementById('topicTexts').value.trim();
+            if (!raw) { box.textContent = '⚠ Insere textos'; box.className = 'result-box error'; return; }
+            const texts = raw.split('\n').filter(t => t.trim());
+            if (texts.length < 2) {
+                box.textContent = '⚠ Para extrair tópicos, insere pelo menos 2 textos (3+ recomendado).';
+                box.className = 'result-box error';
+                return;
+            }
+            const n_topics = parseInt(document.getElementById('nTopics').value) || 3;
+            const n_words = parseInt(document.getElementById('nWords').value) || 8;
+            setLoading(btn, true);
+            try {
+                const r = await fetch(API + '/topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texts, n_topics, n_words }) });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                let txt = `🏷️ ${d.topics.length} tópicos extraídos de ${d.n_documents} documentos\n\n`;
+                d.topics.forEach((topic, i) => {
+                    txt += `Tópico ${i + 1}: ${topic.words.join(', ')}\n`;
+                });
+                box.textContent = txt;
+                box.className = 'result-box success';
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+            }
+            setLoading(btn, false);
+        }
+
+        async function analyzeFile() {
+            const btn = event.target.closest('.btn');
+            const box = document.getElementById('resultFile');
+            const file = document.getElementById('uploadFile').files[0];
+            if (!file) { box.textContent = '⚠ Seleciona um ficheiro'; box.className = 'result-box error'; return; }
+            setLoading(btn, true);
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                const r = await fetch(API + '/analyze/file', { method: 'POST', body: form });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                let txt = `📁 Ficheiro analisado: ${d.filename}\n📝 Textos: ${d.total_texts}\n\n`;
+                if (d.sentiment_summary) {
+                    txt += `😊 Positivos: ${d.sentiment_summary.positive || 0}\n😞 Negativos: ${d.sentiment_summary.negative || 0}\n\n`;
+                }
+                if (d.topics && d.topics.length) {
+                    txt += '🏷️ Tópicos:\n';
+                    d.topics.forEach((t, i) => { txt += `  ${i + 1}. ${t.words.join(', ')}\n`; });
+                }
+                box.textContent = txt;
+                box.className = 'result-box success';
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+            }
+            setLoading(btn, false);
+        }
+
+        checkHealth();
+    </script>
+</body>
+
+</html>

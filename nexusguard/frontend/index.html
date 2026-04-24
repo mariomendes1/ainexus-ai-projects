@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusGuard | Detetor de Anomalias</title>
+    <meta name="description" content="NexusGuard – Detetor de anomalias e fraude em tempo real com Isolation Forest.">
+    <meta name="theme-color" content="#07111f">
+    <link rel="icon" href="https://ainexuspt.com/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Manrope", system-ui, sans-serif;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #edf2f7;
+            background: radial-gradient(circle at 20% 10%, rgba(56, 189, 248, .18), transparent 30%), radial-gradient(circle at 80% 20%, rgba(20, 184, 166, .15), transparent 24%), linear-gradient(180deg, #06111f 0%, #09192b 52%, #06111f 100%);
+            --bg: #06111f;
+            --bg-2: #09192b;
+            --panel: rgba(8, 15, 27, .82);
+            --panel-strong: rgba(9, 18, 32, .94);
+            --line: rgba(148, 163, 184, .14);
+            --line-soft: rgba(148, 163, 184, .08);
+            --text: #edf2f7;
+            --muted: #b4c0cf;
+            --muted-2: #8ea0b6;
+            --sky: #7dd3fc;
+            --teal: #5eead4;
+            --sky-strong: #38bdf8;
+            --shadow: 0 30px 90px rgba(2, 6, 23, .35);
+            --radius-xl: 32px;
+            --radius-lg: 24px;
+            --radius-md: 18px;
+            --font-display: "Fraunces", Georgia, serif
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text)
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none
+        }
+
+        ::selection {
+            color: #fff;
+            background: rgba(56, 189, 248, .28)
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+            font-family: var(--font-display);
+            letter-spacing: -.05em
+        }
+
+        h1 {
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            line-height: 1;
+            color: #fff
+        }
+
+        h2 {
+            font-size: 1.3rem;
+            color: #fff
+        }
+
+        .topbar {
+            position: sticky;
+            top: 16px;
+            z-index: 20;
+            width: min(1180px, calc(100% - 24px));
+            margin: 16px auto 0;
+            padding: 14px 16px;
+            display: flex;
+            gap: 18px;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: rgba(2, 6, 23, .72);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 12px 36px rgba(2, 6, 23, .18)
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none
+        }
+
+        .brand-logo {
+            width: 340px;
+            height: 92px;
+            object-fit: contain;
+            object-position: left center;
+            filter: drop-shadow(0 12px 24px rgba(2, 6, 23, .18))
+        }
+
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center
+        }
+
+        .nav-link {
+            padding: 10px 12px;
+            border-radius: 999px;
+            color: #dce7f3;
+            font-size: .95rem;
+            transition: background .18s, color .18s
+        }
+
+        .nav-link:hover,
+        .nav-link.is-active {
+            background: rgba(125, 211, 252, .12);
+            color: #fff;
+            box-shadow: inset 0 0 0 1px rgba(125, 211, 252, .18)
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0
+        }
+
+        .page {
+            width: min(900px, calc(100% - 24px));
+            margin: 0 auto;
+            padding: 32px 0 60px
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 40px
+        }
+
+        .hero .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 14px;
+            font-size: .74rem;
+            font-weight: 900;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+            color: var(--sky)
+        }
+
+        .hero .lead {
+            color: var(--muted);
+            max-width: 60ch;
+            margin: 12px auto 0;
+            font-size: 1.05rem
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(180deg, rgba(9, 18, 32, .95), rgba(7, 14, 26, .82));
+            box-shadow: var(--shadow);
+            padding: 28px;
+            margin-bottom: 24px
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px
+        }
+
+        .section-title .icon {
+            font-size: 1.4rem
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: .88rem;
+            font-weight: 600
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: rgba(6, 17, 31, .7);
+            color: var(--text);
+            font: inherit;
+            font-size: .95rem;
+            transition: border-color .2s
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--sky-strong)
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: "Courier New", monospace;
+            font-size: .85rem
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: end
+        }
+
+        .form-group {
+            margin-bottom: 16px
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            padding: 0 24px;
+            border: none;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: .95rem;
+            cursor: pointer;
+            transition: transform .18s, box-shadow .18s, background .18s
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--sky-strong), var(--teal));
+            color: #06111f
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(56, 189, 248, .3)
+        }
+
+        .btn-secondary {
+            background: rgba(125, 211, 252, .1);
+            color: var(--sky);
+            border: 1px solid rgba(125, 211, 252, .2)
+        }
+
+        .btn-secondary:hover {
+            background: rgba(125, 211, 252, .18)
+        }
+
+        .btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none
+        }
+
+        .result-box {
+            margin-top: 16px;
+            padding: 18px;
+            border-radius: var(--radius-md);
+            background: rgba(6, 17, 31, .6);
+            border: 1px solid var(--line);
+            min-height: 60px;
+            font-family: "Courier New", monospace;
+            font-size: .88rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--muted);
+            transition: border-color .3s
+        }
+
+        .result-box.success {
+            border-color: rgba(94, 234, 212, .3);
+            color: var(--teal)
+        }
+
+        .result-box.error {
+            border-color: rgba(248, 113, 113, .3);
+            color: #f87171
+        }
+
+        .result-box.anomaly {
+            border-color: rgba(251, 146, 60, .4);
+            color: #fb923c
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 14px 20px;
+            border-radius: 16px;
+            background: rgba(94, 234, 212, .06);
+            border: 1px solid rgba(94, 234, 212, .15);
+            margin-bottom: 24px;
+            font-size: .9rem
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #5eead4;
+            box-shadow: 0 0 8px rgba(94, 234, 212, .5);
+            animation: pulse 2s infinite
+        }
+
+        .status-bar.offline .status-dot {
+            background: #f87171;
+            box-shadow: 0 0 8px rgba(248, 113, 113, .5)
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .5
+            }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px
+        }
+
+        .tab {
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: .88rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: rgba(125, 211, 252, .06);
+            color: var(--muted);
+            border: 1px solid transparent;
+            transition: all .2s
+        }
+
+        .tab.active {
+            background: rgba(125, 211, 252, .12);
+            color: var(--sky);
+            border-color: rgba(125, 211, 252, .2)
+        }
+
+        .tab:hover {
+            color: var(--sky)
+        }
+
+        .tab-content {
+            display: none
+        }
+
+        .tab-content.active {
+            display: block
+        }
+
+        .api-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: .85rem;
+            color: var(--sky);
+            opacity: .7;
+            transition: opacity .2s
+        }
+
+        .api-link:hover {
+            opacity: 1
+        }
+
+        .footer {
+            width: min(900px, calc(100% - 24px));
+            margin: 0 auto;
+            padding: 20px 4px 34px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            color: var(--muted-2);
+            font-size: .92rem;
+            border-top: 1px solid var(--line-soft)
+        }
+
+        .footer a {
+            color: var(--sky)
+        }
+
+        .loader {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(125, 211, 252, .2);
+            border-top-color: var(--sky);
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+            margin-left: 8px
+        }
+
+        .loading .loader {
+            display: inline-block
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        @media(max-width:640px) {
+            .page {
+                padding-top: 14px
+            }
+
+            .topbar {
+                width: min(100% - 16px, 1180px);
+                padding: 12px;
+                border-radius: 22px
+            }
+
+            .form-row {
+                grid-template-columns: 1fr
+            }
+
+            .brand-logo {
+                width: 200px;
+                height: 56px
+            }
+        }
+
+        .menu-toggle {
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            z-index: 25
+        }
+
+        .menu-toggle-bar {
+            display: block;
+            width: 24px;
+            height: 2px;
+            background: var(--text);
+            border-radius: 2px;
+            transition: transform .25s ease, opacity .25s ease
+        }
+
+        @media(max-width:1024px) {
+            .menu-toggle {
+                display: flex
+            }
+
+            .nav {
+                display: none;
+                position: absolute;
+                top: calc(100% + 8px);
+                left: 0;
+                right: 0;
+                flex-direction: column;
+                background: rgba(2, 6, 23, .95);
+                backdrop-filter: blur(18px);
+                border: 1px solid var(--line);
+                border-radius: var(--radius-lg);
+                padding: 16px;
+                gap: 6px
+            }
+
+            .nav-open {
+                display: flex
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <a class="brand" href="https://ainexuspt.com">
+            <img class="brand-logo" src="https://ainexuspt.com/imagens/logo-mm.svg" alt="" aria-hidden="true">
+            <span class="sr-only">Mario Mendes</span>
+        </a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"
+            onclick="var n=document.getElementById('main-nav');n.classList.toggle('nav-open');this.setAttribute('aria-expanded',n.classList.contains('nav-open'))">
+            <span class="menu-toggle-bar"></span><span class="menu-toggle-bar"></span><span
+                class="menu-toggle-bar"></span>
+        </button>
+        <nav class="nav" id="main-nav">
+            <a class="nav-link" href="https://ainexuspt.com/">Início</a>
+            <a class="nav-link" href="https://ainexuspt.com/servicos">Serviços</a>
+            <a class="nav-link" href="https://ainexuspt.com/formacao">Formação</a>
+            <a class="nav-link" href="https://apps.ainexuspt.com">Projetos</a>
+            <a class="nav-link" href="https://ainexuspt.com/sobre">Sobre</a>
+            <a class="nav-link" href="https://ainexuspt.com/contacto">Contacto</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section class="hero">
+            <p class="eyebrow">NexusGuard</p>
+            <h1>🛡️ Detetor de Anomalias</h1>
+            <p class="lead">Monitoriza fluxos de dados e identifica comportamentos suspeitos em tempo real com Isolation
+                Forest.</p>
+        </section>
+
+        <div class="status-bar" id="statusBar">
+            <span class="status-dot"></span>
+            <span id="statusText">A verificar...</span>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="single" onclick="switchTab('single')">Análise Individual</button>
+            <button class="tab" data-tab="batch" onclick="switchTab('batch')">Análise em Lote</button>
+            <button class="tab" data-tab="train" onclick="switchTab('train')">Treinar Modelo</button>
+        </div>
+
+        <!-- Single Prediction -->
+        <div class="tab-content active" id="tab-single">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">🔍</span>
+                    <h2>Detetar Anomalia</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Insere valores numéricos separados por
+                    vírgula. O modelo analisa se o padrão é normal ou anómalo.</p>
+                <div class="form-group">
+                    <label for="features">Valores (features)</label>
+                    <div class="form-row">
+                        <input type="text" id="features" placeholder="ex: 0.5, -1.2, 3.1, 0.8, -0.3" autocomplete="off">
+                        <button class="btn btn-primary" id="btnPredict" onclick="predict()">Analisar <span
+                                class="loader"></span></button>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="fillDemo()"
+                    style="font-size:.85rem;min-height:36px;padding:0 14px;margin-bottom:8px">Usar dados de
+                    exemplo</button>
+                <div class="result-box" id="resultSingle">Os resultados aparecerão aqui...</div>
+            </div>
+        </div>
+
+        <!-- Batch Prediction -->
+        <div class="tab-content" id="tab-batch">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">📊</span>
+                    <h2>Análise em Lote</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Insere múltiplas linhas de dados. Cada
+                    linha é um ponto de dados com valores separados por vírgula.</p>
+                <div class="form-group">
+                    <label for="batchData">Dados (uma linha por observação)</label>
+                    <textarea id="batchData" rows="6"
+                        placeholder="0.5, -1.2, 3.1, 0.8, -0.3&#10;1.0, 0.2, -0.5, 0.3, 0.1&#10;15.0, -20.0, 8.5, 12.0, -5.0"></textarea>
+                </div>
+                <button class="btn btn-primary" id="btnBatch" onclick="batchPredict()">Analisar Lote <span
+                        class="loader"></span></button>
+                <button class="btn btn-secondary" onclick="fillBatchDemo()"
+                    style="font-size:.85rem;min-height:36px;padding:0 14px;margin-left:8px">Dados de exemplo</button>
+                <div class="result-box" id="resultBatch">Os resultados aparecerão aqui...</div>
+            </div>
+        </div>
+
+        <!-- Train -->
+        <div class="tab-content" id="tab-train">
+            <div class="panel">
+                <div class="section-title">
+                    <span class="icon">🎯</span>
+                    <h2>Treinar Modelo</h2>
+                </div>
+                <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Faz upload de um ficheiro CSV com dados
+                    numéricos para re-treinar o modelo Isolation Forest.</p>
+                <div class="form-group">
+                    <label for="csvFile">Ficheiro CSV</label>
+                    <input type="file" id="csvFile" accept=".csv" style="padding:10px">
+                </div>
+                <button class="btn btn-primary" id="btnTrain" onclick="trainModel()">Treinar <span
+                        class="loader"></span></button>
+                <div class="result-box" id="resultTrain">Resultado do treino aparecerá aqui...</div>
+            </div>
+        </div>
+
+        <a class="api-link" href="/nexusguard/docs" target="_blank">📄 Documentação da API (Swagger) →</a>
+    </main>
+
+    <footer class="footer">
+        <span>Mario Mendes / ainexuspt.com</span>
+        <span class="footer-links" style="display:inline-flex;gap:14px;flex-wrap:wrap">
+            <a href="https://apps.ainexuspt.com">← Voltar aos Projetos</a>
+            <a href="mailto:mario.mendes@ainexuspt.com">mario.mendes@ainexuspt.com</a>
+        </span>
+    </footer>
+
+    <script>
+        const API = '/nexusguard';
+
+        async function checkHealth() {
+            try {
+                const r = await fetch(API + '/health');
+                const d = await r.json();
+                document.getElementById('statusText').textContent = d.model_loaded ? 'Modelo carregado — pronto' : 'Modelo não carregado';
+                if (!d.model_loaded) document.getElementById('statusBar').classList.add('offline');
+            } catch {
+                document.getElementById('statusText').textContent = 'Serviço indisponível';
+                document.getElementById('statusBar').classList.add('offline');
+            }
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+        }
+
+        function fillDemo() {
+            document.getElementById('features').value = '0.5, -1.2, 3.1, 0.8, -0.3';
+        }
+
+        function fillBatchDemo() {
+            document.getElementById('batchData').value = '0.5, -1.2, 3.1, 0.8, -0.3\n1.0, 0.2, -0.5, 0.3, 0.1\n-0.3, 0.8, 0.2, -0.1, 0.5\n15.0, -20.0, 8.5, 12.0, -5.0\n0.1, 0.3, -0.2, 0.4, 0.6';
+        }
+
+        function setLoading(btn, loading) {
+            btn.disabled = loading;
+            btn.classList.toggle('loading', loading);
+        }
+
+        async function predict() {
+            const btn = document.getElementById('btnPredict');
+            const box = document.getElementById('resultSingle');
+            const val = document.getElementById('features').value.trim();
+            if (!val) { box.textContent = '⚠ Insere valores separados por vírgula'; box.className = 'result-box error'; return; }
+            const features = val.split(',').map(v => parseFloat(v.trim()));
+            if (features.some(isNaN)) { box.textContent = '⚠ Valores inválidos — usa apenas números'; box.className = 'result-box error'; return; }
+            setLoading(btn, true);
+            try {
+                const r = await fetch(API + '/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ features }) });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                const icon = d.is_anomaly ? '🚨' : '✅';
+                const label = d.is_anomaly ? 'ANOMALIA DETETADA' : 'NORMAL';
+                box.textContent = `${icon} ${label}\n\nPredição: ${d.prediction} (1 = normal, -1 = anomalia)\nScore: ${d.anomaly_score.toFixed(4)}\n\n${d.is_anomaly ? '⚠ Este padrão diverge significativamente dos dados normais.' : '✓ O padrão está dentro dos limites esperados.'}`;
+                box.className = 'result-box ' + (d.is_anomaly ? 'anomaly' : 'success');
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+            }
+            setLoading(btn, false);
+        }
+
+        async function batchPredict() {
+            const btn = document.getElementById('btnBatch');
+            const box = document.getElementById('resultBatch');
+            const raw = document.getElementById('batchData').value.trim();
+            if (!raw) { box.textContent = '⚠ Insere dados'; box.className = 'result-box error'; return; }
+            const data = raw.split('\n').filter(l => l.trim()).map(l => l.split(',').map(v => parseFloat(v.trim())));
+            if (data.some(row => row.some(isNaN))) { box.textContent = '⚠ Valores inválidos'; box.className = 'result-box error'; return; }
+            setLoading(btn, true);
+            try {
+                const r = await fetch(API + '/predict/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }) });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                const anomalies = d.results.filter(x => x.is_anomaly).length;
+                let txt = `📊 Resultados: ${d.results.length} pontos analisados\n🚨 Anomalias: ${anomalies} | ✅ Normais: ${d.results.length - anomalies}\n\n`;
+                d.results.forEach((x, i) => {
+                    txt += `[${i + 1}] ${x.is_anomaly ? '🚨 ANOMALIA' : '✅ Normal'}  score: ${x.anomaly_score.toFixed(4)}\n`;
+                });
+                box.textContent = txt;
+                box.className = 'result-box ' + (anomalies > 0 ? 'anomaly' : 'success');
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+            }
+            setLoading(btn, false);
+        }
+
+        async function trainModel() {
+            const btn = document.getElementById('btnTrain');
+            const box = document.getElementById('resultTrain');
+            const file = document.getElementById('csvFile').files[0];
+            if (!file) { box.textContent = '⚠ Seleciona um ficheiro CSV'; box.className = 'result-box error'; return; }
+            setLoading(btn, true);
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                const r = await fetch(API + '/train', { method: 'POST', body: form });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+                box.textContent = `✅ Modelo treinado com sucesso!\n\nAmostras: ${d.samples_used}\nFeatures: ${d.features}\nContaminação: ${d.contamination}`;
+                box.className = 'result-box success';
+            } catch (e) {
+                box.textContent = '❌ Erro: ' + e.message;
+                box.className = 'result-box error';
+            }
+            setLoading(btn, false);
+        }
+
+        checkHealth();
+    </script>
+</body>
+
+</html>
