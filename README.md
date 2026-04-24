@@ -1,6 +1,8 @@
 # AI Nexus — Machine Learning Projects
 
-A collection of four production-ready AI/ML microservices, each packaged as a Docker container with a FastAPI backend and a web frontend.
+**Live demo:** [ainexuspt.com](https://ainexuspt.com)
+
+A collection of four production-ready AI/ML microservices running at [ainexuspt.com](https://ainexuspt.com), each packaged as a Docker container with a FastAPI backend and a web frontend.
 
 ## Projects
 
@@ -82,7 +84,7 @@ Edit `.env.connector` with your API base URL and token. Leave blank to run witho
 ## Architecture
 
 ```
-apps.ainexuspt.com/
+ainexuspt.com/  (apps.ainexuspt.com)
 ├── docker-compose.yml      # Orchestrates all 4 services
 ├── nexusguard/             # Anomaly & fraud detection
 ├── deepinsight/            # Sentiment & topic analysis
