@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin
@@ -34,10 +35,78 @@ INE_API_ENABLED = os.getenv("INE_API_ENABLED", "1").strip().lower() in {
     "yes",
     "on",
 }
-INE_API_TIMEOUT = float(os.getenv("INE_API_TIMEOUT", "12"))
+INE_API_TIMEOUT = float(os.getenv("INE_API_TIMEOUT", "20"))
 INE_API_URL_TEMPLATE = os.getenv("INE_API_URL_TEMPLATE", "").strip()
 INE_API_DEFAULT_VARCD = os.getenv("INE_API_DEFAULT_VARCD", "").strip()
 INE_API_DEFAULT_LANG = os.getenv("INE_API_DEFAULT_LANG", "PT").strip() or "PT"
+
+# ── INE geocode cache: municipality name → INE geocod ──
+_ine_geo_cache: dict[str, str] = {}  # normalised_name → geocod
+_ine_geo_cache_loaded = False
+
+
+def _ine_name_key(name: str) -> str:
+    """Lowercase + strip accents for fuzzy municipality matching."""
+    nfkd = unicodedata.normalize("NFKD", name or "")
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
+
+
+def _load_ine_geo_cache() -> None:
+    """Fetch INE municipality geocodes on first use (cached for lifetime of process)."""
+    global _ine_geo_cache_loaded
+    if _ine_geo_cache_loaded:
+        return
+    _ine_geo_cache_loaded = True  # set early — don't retry on failure
+    try:
+        url = "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0012248&Dim3=T&lang=PT"
+        with httpx.Client(timeout=20.0, headers={"User-Agent": USER_AGENT}) as client:
+            r = client.get(url)
+            r.raise_for_status()
+            data = r.json()
+        dados = data[0].get("Dados", {})
+        last_period = list(dados.keys())[-1]
+        for entry in dados[last_period]:
+            geocod = entry.get("geocod", "").strip()
+            geodsg = entry.get("geodsg", "").strip()
+            if geocod and geodsg:
+                _ine_geo_cache[_ine_name_key(geodsg)] = geocod
+    except Exception:
+        pass  # cache stays empty; will fall back to PT
+
+
+def _resolve_ine_geo_code(req: "RealStateRequest") -> str:
+    """Return INE geocode for the request: manual override → city lookup → PT fallback."""
+    if req.ine_geo_code and req.ine_geo_code.strip():
+        return req.ine_geo_code.strip()
+
+    _load_ine_geo_cache()
+    if not _ine_geo_cache:
+        return "PT"
+
+    for raw in (req.municipality, req.city):
+        if not raw:
+            continue
+        key = _ine_name_key(raw)
+        if key in _ine_geo_cache:
+            return _ine_geo_cache[key]
+        # partial match — useful for "Lisboa" matching "Grande Lisboa" etc.
+        for cached_key, geocod in _ine_geo_cache.items():
+            if key in cached_key or cached_key in key:
+                return geocod
+
+    return "PT"
+
+
+def _ine_dim3(req: "RealStateRequest") -> str:
+    """Map property_type to INE Dim3: 1=Apartamentos, 2=Moradias, T=Total."""
+    pt = (req.property_type or "").lower().strip()
+    if pt in {"apartment", "apartamento", "flat", "studio"}:
+        return "1"
+    if pt in {"house", "moradia", "vivenda", "villa", "detached"}:
+        return "2"
+    return "T"
+
+
 GEOSPATIAL_PLUGIN_ENABLED = os.getenv("GEOSPATIAL_PLUGIN_ENABLED", "0").strip().lower() in {
     "1",
     "true",
@@ -286,9 +355,12 @@ def _ine_market_reference(req: RealStateRequest) -> dict[str, Any]:
 
     lang = (req.ine_lang or INE_API_DEFAULT_LANG or "PT").strip().upper()
     varcd = (req.ine_varcd or INE_API_DEFAULT_VARCD or "").strip()
-    geo = (req.ine_geo_code or "").strip()
+    geo = _resolve_ine_geo_code(req)  # auto-resolve from city/municipality, fallback PT
+    dim3 = _ine_dim3(req)             # 1=Apartamentos, 2=Moradias, T=Total
     period = (req.ine_period or "").strip()
     direct_url = (req.ine_bdd_url or "").strip()
+
+    dim3_label = {"1": "Apartamentos", "2": "Moradias", "T": "Total"}.get(dim3, dim3)
 
     url = ""
     if direct_url:
@@ -300,6 +372,7 @@ def _ine_market_reference(req: RealStateRequest) -> dict[str, Any]:
                 lang=lang,
                 geo_code=geo,
                 period=period,
+                dim3=dim3,
             )
         except Exception as exc:
             return {"status": "invalid_template", "source": "INE API", "reason": f"Template inválido: {exc}"}
@@ -350,10 +423,9 @@ def _ine_market_reference(req: RealStateRequest) -> dict[str, Any]:
             "status": "ok",
             "source": "INE API",
             "reference_price_m2_eur": round(float(value), 2),
-            "url": url,
-            "http_status": r.status_code,
-            "varcd": varcd or None,
+            "property_type_label": dim3_label,
             "geo_code": geo or None,
+            "varcd": varcd or None,
             "period": period or None,
             "lang": lang,
         }

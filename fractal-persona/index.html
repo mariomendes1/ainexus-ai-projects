@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fractal Persona</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; width: 100vw; height: 100vh; font-family: system-ui, sans-serif; }
+
+    #fractal-canvas {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh; z-index: 1;
+    }
+    #video {
+      position: fixed; bottom: 16px; right: 16px;
+      width: 200px; height: 150px; border-radius: 10px;
+      opacity: 0.75; transform: scaleX(-1);
+      border: 1px solid rgba(0,220,255,0.3); z-index: 10;
+    }
+    #landmark-canvas {
+      position: fixed; bottom: 16px; right: 16px;
+      width: 200px; height: 150px; border-radius: 10px;
+      transform: scaleX(-1); pointer-events: none; z-index: 11;
+    }
+    #status {
+      position: fixed; bottom: 174px; right: 16px;
+      color: rgba(0,220,255,0.55); font-family: monospace;
+      font-size: 11px; letter-spacing: 1px; text-align: right; z-index: 12;
+    }
+
+    /* ── Controls bar ── */
+    #controls {
+      position: fixed; bottom: 20px; left: 20px;
+      display: flex; gap: 10px; z-index: 20;
+    }
+    .ctrl-btn {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(0,220,255,0.35);
+      color: rgba(0,220,255,0.8); font-size: 20px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+      backdrop-filter: blur(8px);
+    }
+    .ctrl-btn:hover { background: rgba(0,220,255,0.15); transform: scale(1.1); }
+    .ctrl-btn:active { transform: scale(0.95); }
+    .ctrl-btn.active {
+      border-color: rgba(0,220,255,0.8);
+      background: rgba(0,220,255,0.18);
+    }
+
+    /* ── Camera picker panel ── */
+    #camera-panel {
+      position: fixed; bottom: 82px; left: 20px;
+      min-width: 220px;
+      background: rgba(4,8,20,0.9);
+      border: 1px solid rgba(0,220,255,0.22);
+      border-radius: 14px; padding: 14px;
+      z-index: 25; backdrop-filter: blur(14px);
+      display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+    }
+    #camera-panel.open { display: block; }
+    #camera-panel h4 {
+      color: rgba(0,220,255,0.6);
+      font-size: 0.68rem; letter-spacing: 0.12em;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+    .cam-option {
+      display: block; width: 100%; padding: 9px 12px;
+      border-radius: 8px; border: none;
+      background: transparent; color: rgba(255,255,255,0.65);
+      font-size: 0.83rem; cursor: pointer; text-align: left;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cam-option:hover { background: rgba(0,220,255,0.1); color: white; }
+    .cam-option.active { color: rgba(0,220,255,0.9); font-weight: 600; }
+
+    /* flash on screenshot */
+    #flash {
+      position: fixed; inset: 0; background: #fff;
+      opacity: 0; pointer-events: none; z-index: 100;
+      transition: opacity 0.08s;
+    }
+
+    /* ── Welcome overlay ── */
+    #welcome {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 32px;
+      transition: opacity 0.6s;
+    }
+    #welcome.hidden { opacity: 0; pointer-events: none; }
+
+    .wlc-title {
+      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      font-weight: 700; color: #fff; letter-spacing: -0.03em;
+      text-align: center;
+    }
+    .wlc-title span { color: rgba(0,220,255,0.9); }
+
+    .wlc-gestures {
+      display: flex; gap: 18px; flex-wrap: wrap; justify-content: center;
+    }
+    .wlc-gesture {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(0,220,255,0.18);
+      border-radius: 18px; padding: 18px 20px; min-width: 110px;
+    }
+    .wlc-gesture .icon { font-size: 2.2rem; }
+    .wlc-gesture .label {
+      font-size: 0.75rem; color: rgba(255,255,255,0.55);
+      text-align: center; line-height: 1.4; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ── Welcome camera selector ── */
+    #wlc-cam-wrap {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(0,220,255,0.2);
+      border-radius: 12px;
+      padding: 10px 16px;
+    }
+    #wlc-cam-wrap.visible { display: flex; }
+    #wlc-cam-wrap label {
+      color: rgba(0,220,255,0.75); font-size: 0.78rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      white-space: nowrap;
+    }
+    #wlc-cam-select {
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(0,220,255,0.28);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.85);
+      font-size: 0.85rem;
+      padding: 6px 10px;
+      cursor: pointer;
+      outline: none;
+      min-width: 180px;
+    }
+    #wlc-cam-select option { background: #060c1a; }
+
+    .wlc-hint {
+      color: rgba(255,255,255,0.3); font-size: 0.82rem; letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .wlc-progress {
+      width: 180px; height: 2px; background: rgba(255,255,255,0.1);
+      border-radius: 2px; overflow: hidden;
+    }
+    .wlc-progress-bar {
+      height: 100%; width: 0%;
+      background: rgba(0,220,255,0.7);
+      transition: width linear;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fractal-canvas"></canvas>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="landmark-canvas"></canvas>
+  <div id="status">a iniciar...</div>
+
+  <!-- Controls: screenshot · mic · camera -->
+  <div id="controls">
+    <button class="ctrl-btn" id="btn-shot" title="Guardar imagem">📷</button>
+    <button class="ctrl-btn" id="btn-mic" title="Ativar microfone">🎙️</button>
+    <button class="ctrl-btn" id="btn-cam" title="Selecionar câmara">📹</button>
+  </div>
+
+  <!-- Camera selection panel -->
+  <div id="camera-panel">
+    <h4>Câmara</h4>
+    <div id="camera-list"></div>
+  </div>
+
+  <div id="flash"></div>
+
+  <!-- Welcome overlay -->
+  <div id="welcome">
+    <div class="wlc-title">Fractal <span>Persona</span></div>
+    <div class="wlc-gestures">
+      <div class="wlc-gesture">
+        <span class="icon">✋</span>
+        <span class="label">Mover a mão<br>muda a forma</span>
+      </div>
+      <div class="wlc-gesture">
+        <span class="icon">🤏</span>
+        <span class="label">Pinch polegar<br>controla zoom</span>
+      </div>
+      <div class="wlc-gesture">
+        <span class="icon">🔄</span>
+        <span class="label">Inclinar<br>roda o fractal</span>
+      </div>
+      <div class="wlc-gesture">
+        <span class="icon">🖐</span>
+        <span class="label">3+ dedos<br>muda cores</span>
+      </div>
+      <div class="wlc-gesture">
+        <span class="icon">🎙️</span>
+        <span class="label">Som<br>modula zoom</span>
+      </div>
+      <div class="wlc-gesture">
+        <span class="icon">📹</span>
+        <span class="label">Escolher<br>câmara</span>
+      </div>
+    </div>
+    <div id="wlc-cam-wrap">
+      <label for="wlc-cam-select">📹 Câmara</label>
+      <select id="wlc-cam-select"></select>
+    </div>
+
+    <div class="wlc-hint">Mostra a mão à câmara para começar</div>
+    <div class="wlc-progress"><div class="wlc-progress-bar" id="wlc-bar"></div></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="fractal.js?v=9"></script>
+  <script src="hand.js?v=10"></script>
+  <script src="main.js?v=10"></script>
+</body>
+</html>

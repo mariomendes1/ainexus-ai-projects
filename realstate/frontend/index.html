@@ -157,8 +157,16 @@
             padding: 0 22px;
             font-weight: 800;
             cursor: pointer;
-            background: linear-gradient(135deg, var(--sky), var(--teal));
-            color: #06222d
+            background: #238cff;
+            color: #06111f;
+            box-shadow: 0 10px 24px rgba(35, 140, 255, .24);
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            background: #3297ff;
+            box-shadow: 0 12px 30px rgba(35, 140, 255, .32)
         }
 
         .btn:disabled {
@@ -936,39 +944,42 @@
                     <div class="tool-title">INE Referência de Mercado</div>
                     <div class="tool-line"><strong>Estado:</strong> ${ineRef.status || 'n/d'}</div>
                     <div class="tool-line"><strong>Valor ref. m²:</strong> ${euro(ineRef.reference_price_m2_eur)}</div>
+                    <div class="tool-line"><strong>Tipo:</strong> ${ineRef.property_type_label || 'Total'}</div>
+                    <div class="tool-line"><strong>Município:</strong> ${ineRef.geo_code || 'n/d'}</div>
                     <div class="tool-line"><strong>Indicador:</strong> ${ineRef.varcd || 'n/d'}</div>
-                    <div class="tool-line"><strong>Período:</strong> ${ineRef.period || 'n/d'}</div>
                 </div>
             `;
-            html += `
+            // Conector Oficial — só mostrar quando ativo e com dados úteis
+            if (connector.status === 'ok' || connector.area_m2) {
+                html += `
                 <div class="tool-card">
                     <div class="tool-title">Conector Oficial</div>
                     <div class="tool-line"><strong>Estado:</strong> ${connector.status || 'n/d'}</div>
-                    <div class="tool-line"><strong>HTTP:</strong> ${connector.http_status || 'n/d'}</div>
                     <div class="tool-line"><strong>Área API:</strong> ${connector.area_m2 ? connector.area_m2 + ' m²' : 'n/d'}</div>
-                    <div class="tool-line"><strong>Motivo:</strong> ${connector.reason || 'n/d'}</div>
+                    ${connector.reason ? `<div class="tool-line"><strong>Detalhe:</strong> ${connector.reason}</div>` : ''}
                 </div>
-            `;
-            html += `
+            `;}
+            // Validação de Área — sempre mostrar quando há área
+            if (areaVal.area_used_m2) {
+                const areaSource = areaVal.source && areaVal.source !== 'Não fornecida' ? areaVal.source : 'Declarada pelo utilizador';
+                const areaConfirmed = areaVal.status === 'confirmed' || areaVal.status === 'api_confirmed';
+                html += `
                 <div class="tool-card">
-                    <div class="tool-title">Validação de Área (Fonte Oficial)</div>
-                    <div class="tool-line"><strong>Estado:</strong> ${areaVal.label || 'n/d'}</div>
-                    <div class="tool-line"><strong>Área usada:</strong> ${areaVal.area_used_m2 ? areaVal.area_used_m2 + ' m²' : 'n/d'}</div>
-                    <div class="tool-line"><strong>Fonte:</strong> ${areaVal.source || 'Não fornecida'}</div>
-                    <div class="tool-line"><strong>Referência:</strong> ${areaVal.reference || 'n/d'}</div>
+                    <div class="tool-title">Área do Imóvel</div>
+                    <div class="tool-line"><strong>Área usada:</strong> ${areaVal.area_used_m2} m²</div>
+                    <div class="tool-line"><strong>Fonte:</strong> ${areaSource}</div>
+                    ${areaConfirmed && areaVal.reference ? `<div class="tool-line"><strong>Referência:</strong> ${areaVal.reference}</div>` : ''}
                 </div>
-            `;
-            html += `
+            `;}
+            // Fontes Oficiais — só mostrar quando há fonte selecionada
+            if (sources.selected_source && sources.selected_source !== 'none') {
+                html += `
                 <div class="tool-card">
-                    <div class="tool-title">Uso de Fontes Oficiais</div>
-                    <div class="tool-line"><strong>Fonte selecionada:</strong> ${sources.selected_source || 'Nenhuma'}</div>
-                    <div class="tool-line"><strong>Aplicada na decisão:</strong> ${sources.used_in_decision ? 'Sim' : 'Não'}</div>
-                    <div class="tool-line"><strong>Validação séria (API):</strong> ${sources.serious_validation ? 'Sim' : 'Não'}</div>
-                    <div class="tool-line"><strong>Nível atual:</strong> ${sources.validation_level || 'n/d'}</div>
-                    <div class="tool-line"><strong>Conector AT/Justiça/BUPi:</strong> ${sources.official_connectors?.AT_justica_bupi?.status || 'n/d'}</div>
-                    <div class="tool-line"><strong>OSM geoespacial:</strong> ${sources.free_sources?.openstreetmap_nominatim?.status || 'n/d'}</div>
+                    <div class="tool-title">Fontes Oficiais</div>
+                    <div class="tool-line"><strong>Fonte:</strong> ${sources.selected_source}</div>
+                    <div class="tool-line"><strong>Validação:</strong> ${sources.serious_validation ? 'Confirmada por API' : 'Documental'}</div>
                 </div>
-            `;
+            `;}
             html += `
                 <div class="tool-card">
                     <div class="tool-title">Mercado</div>
